@@ -1,20 +1,20 @@
 # Implementazione di algoritmi di routing su ebpf
----
+
 Questi programmi si basano sulle lezioni di [XDP tutorial](https://github.com/xdp-project/xdp-tutorial).
 
 ---
 
 ## Programmi:
-- [[#Drop]]
-- [[#DropIp]]
-- [[#DropPorta]]
-- [[#Dir24]]
-- [[#Dir24Hash]]
-- [[#Dir2432]]
-- [[#LPM1-32]]
-- [[#LPMtrie]]
-- [[#Mappe20232432]]
-- [[#MappePari]]
+- [Drop](#drop)
+- [DropIP](#dropip)
+- [DropPorta](#dropporta)
+- [Dir24](#dir24)
+- [Dir24Hash](#dir24hash)
+- [Dir2432](#dir2432)
+- [LPM1-32](#lpm1-32)
+- [LPMtrie](#lpmtrie)
+- [Mappe20232432](#mappe20232432)
+- [MappePari](#mappepari)
 
 
 ### Drop
@@ -43,8 +43,13 @@ if (nh_type == bpf_ntohs(1024))
 ### Dir24
 Il programma legge gli ip contenuti nella cartella *mappe* e inserisce gli ip contenuti nel file /24 in un array con 16.777.216 entries e tutti gli altri ip, da /25 a /32 in un LPM_TRIE, poi controlla se sono contenuti nell'array o nella mappa e li blocca.
 
+Per permettere il funzionamento del programma la cartella mappe.zip va estratta.
+
 ### Dir24Hash
 Il programma funziona come il precedente, Dir24, ma gli ip contenuti nei file da /25 a /32 vengono inseriti in 8 HashMap diverse.
+
+Per permettere il funzionamento del programma la cartella mappe.zip va estratta.
+
 ### Dir2432
 Il programma funziona come il precedente, Dir24, ma gli ip da /25 a /32 sono espansi in un unica HashMap.
 L'espansione delle rotte viene eseguita tramite la libreria python **ipaddress**.
@@ -52,10 +57,14 @@ L'espansione delle rotte viene eseguita tramite la libreria python **ipaddress**
 #crea una lista di ip espansi a /32 dall'ip e prefisso in input e lo salva in ips rimuovendo /32
 ips = [str(ip1).split("/")[0] for ip1 in ipaddress.IPv4Network(ip+"/"+prefix).subnets(new_prefix=32)]
 ```
+Per permettere il funzionamento del programma la cartella mappe.zip va estratta.
+
 ### LPM1-32
 Il programma crea 32 Hashmap, una per ogni file nella cartella *mappe*, da /1 a /32.
 Per ogni pacchetto ricevuto, controlla se l'ip è presente nelle mappe partendo da 32 a scendere, una volta trovato l'ip, il pacchetto viene bloccato e viene incrementato il contatore della mappa in cui è stato trovato.
 Il programma stampa una lista di tutte e 32 le mappe con i relativi contatori, PPS e Mbits/s, più una contenente la somma dei vari contatori.
+
+Per permettere il funzionamento del programma la cartella mappe.zip va estratta.
 
 ### LPMtrie
 Il programma implementa LPM usando una struttura di ebpf, **BPF_MAP_TYPE_LPM_TRIE**, per contenere tutti gli indirizzi ip.
@@ -85,12 +94,20 @@ key4.b8[7] = (ip_src >> 24) & 0xff;
 //controlla se è presente nel trie
 value = bpf_map_lookup_elem(&lpm,&key4);
 ```
+
+Per permettere il funzionamento del programma la cartella mappe.zip va estratta
+
 ### Mappe20232432
 Gli ip vengono espansi dalle 32 rotte a solo 4: /20, /23, /24, /32 per avere 4 HashMap con numeri simili di ip all'interno e ridurre al minimo gli accessi in mappa.
 Esegue LPM sulle 4 mappe da /32 fino a /20.
+
+Per permettere il funzionamento del programma la cartella mappe.zip va estratta
+
 ### MappePari
 Gli ip vengono espansi dalle rotte dispari a quelle pari /9 --> /10 dimezzando gli accessi in mappa.
 Esegue LPM sulle 18 mappe.
+
+Per permettere il funzionamento del programma la cartella mappe.zip va estratta
 
 ---
 
@@ -99,5 +116,4 @@ Le macchine usate per inviare e processare i pacchetti sono state fornite da [Cl
 I dati sono stati presi usando macchine con schede di rete a 100Gbit/s e processori a 64 core.
 Per la generazione di pacchetti è stato usato [TRex - Cisco ](https://github.com/cisco-system-traffic-generator/trex-core)
 
-![[Dati.png]]
-
+![Dati](Dati.png)
