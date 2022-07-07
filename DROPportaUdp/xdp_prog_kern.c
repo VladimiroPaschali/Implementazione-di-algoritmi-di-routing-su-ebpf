@@ -12,10 +12,7 @@
 #include <linux/icmpv6.h>
 #include <linux/udp.h>
 #include <linux/tcp.h>
-
-
 #include "common_kern_user.h" /* defines: struct datarec; */
-
 
 struct bpf_map_def SEC("maps") xdp_stats_map = {
 	.type        = BPF_MAP_TYPE_PERCPU_ARRAY,
@@ -42,7 +39,6 @@ static __always_inline int parse_ethhdr(struct hdr_cursor *nh,
 {
 	struct ethhdr *eth = nh->pos;
 	int hdrsize = sizeof(*eth);
-
 	/* Byte-count bounds check; check if current pointer + size of header
 	 * is after data_end.
 	 */
@@ -50,78 +46,49 @@ static __always_inline int parse_ethhdr(struct hdr_cursor *nh,
 		return -1;
 	nh->pos += hdrsize;
 	*ethhdr = eth;
-
 	return eth->h_proto; /* network-byte-order */
 }
-//cerca il tipo di protocollo tcp udp nel pacchetto ip lo ritorna in binario
+//cerca il tipo di protocollo tcp udp nel pacchetto ip
 static __always_inline int parse_iphdr(struct hdr_cursor *nh,
 				       void *data_end,
 				       struct iphdr **iphdr)
 {
 	struct iphdr *iph = nh->pos;
 	int hdrsize;
-
 	if (iph + 1 > data_end)
 		return -1;
-
 	hdrsize = iph->ihl * 4;
-
 	if(hdrsize < sizeof(*iph))
 		return -1;
-
-
-
 	if (nh->pos + hdrsize > data_end)
 		return -1;
-
-
 	nh->pos += hdrsize;
 	*iphdr = iph;
-
-
 	return iph->protocol;
 	//return iph->saddr;//ip address source
 }
-//cerca la porta di destinazione all'interno dell'header tcp
-static __always_inline int parse_tcphdr(struct hdr_cursor *nh,
+//cerca la porta di destinazione all'interno dell'header udp
+static __always_inline int parse_udphdr(struct hdr_cursor *nh,
 					void *data_end,
-					struct tcphdr **tcphdr)
+					struct udphdr **udphdr)
 {
-	int len;
-	struct tcphdr *h = nh->pos;
-
-
+	//int len;
+	struct udphdr *h = nh->pos;
 	if (h + 1 > data_end)
 		return -1;
-
-
-	len = h->doff * 4;
-	/* Sanity check packet field is valid */
-	if(len < sizeof(*h))
-		return -1;
-
-
-	/* Variable-length TCP header, need to use byte-based arithmetic */
-	if (nh->pos + len > data_end)
-		return -1;
-
-
-	nh->pos += len;
-	*tcphdr = h;
-
-
-	return h->dest;
+	nh->pos  = h + 1;
+	*udphdr = h;
+	/*len = bpf_ntohs(h->len) - sizeof(struct udphdr);
+	if (len < 0)
+		return -1;*/
+	return h->source;
 }
-
-
 SEC("xdp_stats1")
 int  xdp_stats1_func(struct xdp_md *ctx)
 {
 
 	void *data_end = (void *)(long)ctx->data_end;
 	void *data = (void *)(long)ctx->data;
-
-
 	struct hdr_cursor nh;
 	int nh_type;
 	nh.pos = data;
@@ -130,24 +97,20 @@ int  xdp_stats1_func(struct xdp_md *ctx)
 	struct ethhdr *eth;
 	__u64 bytes = data_end - data;
 
-
-
 	nh_type = parse_ethhdr(&nh, data_end, &eth);
-
-
 	if (nh_type == bpf_htons(ETH_P_IP)) {
 		struct iphdr *iph;
-		//blocca il pscchrtto tcp invisto verso porta 1024
+		//cerca tipo di protocollo udp in iphdr
 		nh_type = parse_iphdr(&nh, data_end, &iph);
-		if (nh_type == IPPROTO_TCP){
-			struct tcphdr *tcp;
-			nh_type = parse_tcphdr(&nh, data_end, &tcp);
-			if (nh_type == bpf_ntohs(1024))
+		if (nh_type == IPPROTO_UDP){
+			struct udphdr *udp;
+			//cerca numero porta in udphdr e blocca il 443
+			nh_type = parse_udphdr(&nh, data_end, &udp);
+			if (nh_type == bpf_ntohs(443))
 				action = XDP_DROP;
 		}
 
 	}
-
 	//carica nella mappa xdp_stats_map i pacchetti e il numero di bytes
 	rec = bpf_map_lookup_elem(&xdp_stats_map, &action);
 	if (!rec)
