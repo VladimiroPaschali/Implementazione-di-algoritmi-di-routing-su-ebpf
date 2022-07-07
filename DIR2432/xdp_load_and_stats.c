@@ -190,7 +190,7 @@ void map_get_value_percpu_array(int fd, __u32 key, struct datarec *value)
 		return;
 	}
 
-	/* Somma le statistiche per ogni mappa */
+	/* Somma le statistiche per ogni core */
 	for (i = 0; i < nr_cpus; i++) {
 		sum_pkts  += values[i].rx_packets;
 		sum_bytes += values[i].rx_bytes;

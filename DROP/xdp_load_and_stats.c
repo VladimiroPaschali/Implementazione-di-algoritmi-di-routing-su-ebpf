@@ -125,7 +125,7 @@ static void stats_print(struct stats_record *stats_rec,
 	stats_print_header(); /* Print stats "header" */
 
 
-	/* stampa per ogni mappa */
+	/* Print for each XDP actions stats */
 	for (i = 0; i < XDP_ACTION_MAX; i++)
 	{
 		char *fmt = "%-12s %'11lld pkts (%'10.0f pps)"
@@ -177,7 +177,7 @@ void map_get_value_percpu_array(int fd, __u32 key, struct datarec *value)
 	}
 
 
-	/* Somma le statistiche per ogni mappa */
+	/* Somma le statistiche per ogni core */
 	for (i = 0; i < nr_cpus; i++) {
 		sum_pkts  += values[i].rx_packets;
 		sum_bytes += values[i].rx_bytes;
