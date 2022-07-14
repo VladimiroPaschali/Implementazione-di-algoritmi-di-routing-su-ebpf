@@ -66,7 +66,7 @@ Il programma stampa una lista di tutte e 32 le mappe con i relativi contatori, P
 Per permettere il funzionamento del programma la cartella mappe.zip va estratta.
 
 ## LPMtrie
-Il programma implementa LPM usando una struttura di ebpf, **BPF_MAP_TYPE_LPM_TRIE**, per contenere tutti gli indirizzi ip.
+Il programma implementa LPM usando una struttura di ebpf, **BPF_MAP_TYPE_LPM_TRIE**, per contenere tutti gli indirizzi ip.  
 Caricamento ip nel trie:
 ``` c
 size_t key_size_ipv4;
