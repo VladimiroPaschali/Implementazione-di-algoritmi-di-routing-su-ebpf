@@ -78,7 +78,6 @@ struct bpf_map_def SEC("maps") dati = {
 	.max_entries = 33,
 };
 
-
 /* Header cursor to keep track of current parsing position */
 struct hdr_cursor {
 	void *pos;
@@ -132,13 +131,10 @@ int  xdp_stats1_func(struct xdp_md *ctx)
 	struct datarec *rec;
 	//azione di default = drop
 	__u32 action = XDP_DROP;
-	//indici mappa dati
-    __u32 i[33]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,31};
-    //maschere da /32 a /1
-	__u32 mask[33]={4294967295,4278190079,4244635647,4177526783,4043309055,3774873599,3238002687,2164260863,
-    2164260863,16580607,16318463,15794175,14745599,12648447,8454143,65535,65279,64767,63743,61695,57599,49407,33023,255,254,252,248,240,224,192,128};
+	//indici dati
+    __u32 i[33]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32};
+    __u8 *value;
 
-	__u32 ipmask[33];
 	struct ethhdr *eth;
 	//calcola byte per pacchetto
 	__u64 bytes = data_end - data;
@@ -148,70 +144,78 @@ int  xdp_stats1_func(struct xdp_md *ctx)
 		struct iphdr *iph;
 		//salva ip sorgente
 		__u32 ip_src = (long)parse_iphdr(&nh, data_end, &iph);
-        //mette in and l'ip con le 32 maschere per mascherarli
+		//maschera gli ip con la maschera 255.0.0.0
+		__u32 ipmask24= ip_src&16777215;
+		__u32 mask[33]={4294967295,4278190079,4244635647,4177526783,4043309055,3774873599,3238002687,2164260863,
+    				2164260863,16580607,16318463,15794175,14745599,12648447,8454143,65535,65279,64767,63743,61695,57599,49407,33023,255,254,252,248,240,224,192,128};
+		__u32 ipmask[33];
+
+		//mette in and l'ip con le 32 maschere per mascherarli
 		for(int i=0; i<32;i++){
 			ipmask[i]=ip_src&mask[i];
 		}
-		//controlla se c'è il valore nella mappa /32 se c'è scrive in dati[32]
-		//e termina altrimenti continua con /31 fino a /24
-        if(bpf_map_lookup_elem(&lpm32, &ipmask[0])){
+
+		value = bpf_map_lookup_elem(&lpm24, &ipmask24);
+		//l'ip sta solo nella prima mappa
+		if(value == 0){
+			rec = bpf_map_lookup_elem(&dati, &i[24]);
+			if (!rec)
+			    return XDP_ABORTED;
+			rec->rx_packets++;
+			rec->rx_bytes += bytes;
+		}
+		//value = 1 ip nelle mappe da 32 a 25
+		else{
+			if(bpf_map_lookup_elem(&lpm32, &ipmask[0])){
             rec = bpf_map_lookup_elem(&dati, &i[32]);
             if (!rec)
                 return XDP_ABORTED;
             rec->rx_packets++;
             rec->rx_bytes += bytes;
-        }else if(bpf_map_lookup_elem(&lpm31, &ipmask[1])){
-                        rec = bpf_map_lookup_elem(&dati, &i[31]);
-            if (!rec)
-                return XDP_ABORTED;
-            rec->rx_packets++;
-            rec->rx_bytes += bytes;
-        }else if(bpf_map_lookup_elem(&lpm30, &ipmask[2])){
-                        rec = bpf_map_lookup_elem(&dati, &i[30]);
-            if (!rec)
-                return XDP_ABORTED;
-            rec->rx_packets++;
-            rec->rx_bytes += bytes;
-        }else if(bpf_map_lookup_elem(&lpm29, &ipmask[3])){
-                        rec = bpf_map_lookup_elem(&dati, &i[29]);
-            if (!rec)
-                return XDP_ABORTED;
-            rec->rx_packets++;
-            rec->rx_bytes += bytes;
-        }else if(bpf_map_lookup_elem(&lpm28, &ipmask[4])){
-                        rec = bpf_map_lookup_elem(&dati, &i[28]);
-            if (!rec)
-                return XDP_ABORTED;
-            rec->rx_packets++;
-            rec->rx_bytes += bytes;
-        }else if(bpf_map_lookup_elem(&lpm27, &ipmask[5])){
-                        rec = bpf_map_lookup_elem(&dati, &i[27]);
-            if (!rec)
-                return XDP_ABORTED;
-            rec->rx_packets++;
-            rec->rx_bytes += bytes;
-        }else if(bpf_map_lookup_elem(&lpm26, &ipmask[6])){
-                        rec = bpf_map_lookup_elem(&dati, &i[26]);
-            if (!rec)
-                return XDP_ABORTED;
-            rec->rx_packets++;
-            rec->rx_bytes += bytes;
-        }else if(bpf_map_lookup_elem(&lpm25, &ipmask[7])){
-                        rec = bpf_map_lookup_elem(&dati, &i[25]);
-            if (!rec)
-                return XDP_ABORTED;
-            rec->rx_packets++;
-            rec->rx_bytes += bytes;
-        }else if(bpf_map_lookup_elem(&lpm24, &ipmask[8])){
-                        rec = bpf_map_lookup_elem(&dati, &i[24]);
-            if (!rec)
-                return XDP_ABORTED;
-            rec->rx_packets++;
-            rec->rx_bytes += bytes;
-        }
-
-
-
+			}else if(bpf_map_lookup_elem(&lpm31, &ipmask[1])){
+							rec = bpf_map_lookup_elem(&dati, &i[31]);
+				if (!rec)
+					return XDP_ABORTED;
+				rec->rx_packets++;
+				rec->rx_bytes += bytes;
+			}else if(bpf_map_lookup_elem(&lpm30, &ipmask[2])){
+							rec = bpf_map_lookup_elem(&dati, &i[30]);
+				if (!rec)
+					return XDP_ABORTED;
+				rec->rx_packets++;
+				rec->rx_bytes += bytes;
+			}else if(bpf_map_lookup_elem(&lpm29, &ipmask[3])){
+							rec = bpf_map_lookup_elem(&dati, &i[29]);
+				if (!rec)
+					return XDP_ABORTED;
+				rec->rx_packets++;
+				rec->rx_bytes += bytes;
+			}else if(bpf_map_lookup_elem(&lpm28, &ipmask[4])){
+							rec = bpf_map_lookup_elem(&dati, &i[28]);
+				if (!rec)
+					return XDP_ABORTED;
+				rec->rx_packets++;
+				rec->rx_bytes += bytes;
+			}else if(bpf_map_lookup_elem(&lpm27, &ipmask[5])){
+							rec = bpf_map_lookup_elem(&dati, &i[27]);
+				if (!rec)
+					return XDP_ABORTED;
+				rec->rx_packets++;
+				rec->rx_bytes += bytes;
+			}else if(bpf_map_lookup_elem(&lpm26, &ipmask[6])){
+							rec = bpf_map_lookup_elem(&dati, &i[26]);
+				if (!rec)
+					return XDP_ABORTED;
+				rec->rx_packets++;
+				rec->rx_bytes += bytes;
+			}else if(bpf_map_lookup_elem(&lpm25, &ipmask[7])){
+							rec = bpf_map_lookup_elem(&dati, &i[25]);
+				if (!rec)
+					return XDP_ABORTED;
+				rec->rx_packets++;
+				rec->rx_bytes += bytes;
+			}
+		}
 		//salva nella mappa all'indirizzo 0 che contiene i valori totali
         rec = bpf_map_lookup_elem(&dati, &i[0]);
         if (!rec)
@@ -219,6 +223,5 @@ int  xdp_stats1_func(struct xdp_md *ctx)
         rec->rx_packets++;
         rec->rx_bytes += bytes;
 	}
-	//return DROP
 	return action;
 }

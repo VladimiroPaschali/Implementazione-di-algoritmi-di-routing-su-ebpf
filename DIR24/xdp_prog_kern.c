@@ -25,7 +25,6 @@ union key_4 {
 	__u32 b32[2];
 	__u8 b8[8];
 };
-
 struct bpf_map_def SEC("maps") lpm = {
 	.type        = BPF_MAP_TYPE_LPM_TRIE,
 	.key_size    = sizeof(__u64),
@@ -33,14 +32,12 @@ struct bpf_map_def SEC("maps") lpm = {
 	.max_entries = 1000000,
 	.map_flags   = BPF_F_NO_PREALLOC,
 };
-
 struct bpf_map_def SEC("maps") dati = {
 	.type        = BPF_MAP_TYPE_PERCPU_ARRAY,
 	.key_size    = sizeof(__u32),
 	.value_size  = sizeof(struct datarec),
 	.max_entries = 33,
 };
-
 
 /* Header cursor to keep track of current parsing position */
 struct hdr_cursor {
@@ -99,7 +96,6 @@ int  xdp_stats1_func(struct xdp_md *ctx)
     __u32 i[33]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32};
     __u8 *value;
 
-
 	struct ethhdr *eth;
 	//calcola byte per pacchetto
 	__u64 bytes = data_end - data;
@@ -119,24 +115,21 @@ int  xdp_stats1_func(struct xdp_md *ctx)
 		key4.b8[5] = (ip_src >> 8) & 0xff;
 		key4.b8[6] = (ip_src >> 16) & 0xff;
 		key4.b8[7] = (ip_src >> 24) & 0xff;
-		//controlla se è presente nel trie
-		value = bpf_map_lookup_elem(&lpm,&key4);
-		if (value){
-	  		if(*value>=0&&*value<=32){
-
-				//aumenta il contatore dei pacchetti e dei bytes per la mappa dati in output letta dal file kernel
-				rec = bpf_map_lookup_elem(&dati, &i[32]);
-				if (!rec)
-				    return XDP_ABORTED;
-				rec->rx_packets++;
-				rec->rx_bytes += bytes;
-			}
-		//controlla se è presente nell'array
-  		}else if(bpf_map_lookup_elem(&lpm24, &ipmask24)){
-
-				//aumenta il contatore dei pacchetti e dei bytes per la mappa dati in output letta dal file kernel
-			 	rec = bpf_map_lookup_elem(&dati, &i[24]);
-				if (!rec)
+		value = bpf_map_lookup_elem(&lpm24, &ipmask24);
+		//l'ip sta solo nella prima mappa
+		if(value == 0){
+			rec = bpf_map_lookup_elem(&dati, &i[24]);
+			if (!rec)
+			    return XDP_ABORTED;
+			rec->rx_packets++;
+			rec->rx_bytes += bytes;
+		}
+		//value = 1 ip nella seconda mappa
+		else{
+			value = bpf_map_lookup_elem(&lpm,&key4);
+			//rec = bpf_map_lookup_elem(&dati, &i[*value]);
+			rec = bpf_map_lookup_elem(&dati, &i[32]);
+			if (!rec)
 				    return XDP_ABORTED;
 				rec->rx_packets++;
 				rec->rx_bytes += bytes;

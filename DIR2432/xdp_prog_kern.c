@@ -110,18 +110,20 @@ int  xdp_stats1_func(struct xdp_md *ctx)
 		__u32 ipmask24= ip_src&16777215;
 
 
-		//controlla se c'è il valore nella mappa /32 se c'è scrive in dati[32]
-		if(bpf_map_lookup_elem(&lpm32, &ip_src)){
-            rec = bpf_map_lookup_elem(&dati, &i[32]);
-            if (!rec)
-                return XDP_ABORTED;
-            rec->rx_packets++;
-            rec->rx_bytes += bytes;
-		//altrimenti controlla in /24
-  		}else if(bpf_map_lookup_elem(&lpm24, &ipmask24)){
-
-			 	rec = bpf_map_lookup_elem(&dati, &i[24]);
-				if (!rec)
+		value = bpf_map_lookup_elem(&lpm24, &ipmask24);
+		//l'ip sta solo nella prima mappa
+		if(value == 0){
+			rec = bpf_map_lookup_elem(&dati, &i[24]);
+			if (!rec)
+			    return XDP_ABORTED;
+			rec->rx_packets++;
+			rec->rx_bytes += bytes;
+		}
+		//value = 1 ip nella seconda mappa
+		else{
+			value = bpf_map_lookup_elem(&lpm32, &ip_src);
+			rec = bpf_map_lookup_elem(&dati, &i[32]);
+			if (!rec)
 				    return XDP_ABORTED;
 				rec->rx_packets++;
 				rec->rx_bytes += bytes;

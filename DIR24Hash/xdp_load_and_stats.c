@@ -19,46 +19,31 @@ static const char *__doc__ = "XDP loader and stats program\n"
 #include "bpf_util.h" /* bpf_num_possible_cpus */
 #include <arpa/inet.h>
 #include <assert.h>
-
 static const char *default_filename = "xdp_prog_kern.o";
 static const char *default_progsec = "xdp_stats1";
-
-
 static const struct option_wrapper long_options[] = {
 	{{"help",        no_argument,		NULL, 'h' },
 	 "Show help", false},
-
 	{{"dev",         required_argument,	NULL, 'd' },
 	 "Operate on device <ifname>", "<ifname>", true},
-
 	{{"skb-mode",    no_argument,		NULL, 'S' },
 	 "Install XDP program in SKB (AKA generic) mode"},
-
 	{{"native-mode", no_argument,		NULL, 'N' },
 	 "Install XDP program in native mode"},
-
 	{{"auto-mode",   no_argument,		NULL, 'A' },
 	 "Auto-detect SKB or native mode"},
-
 	{{"force",       no_argument,		NULL, 'F' },
 	 "Force install, replacing existing program on interface"},
-
 	{{"unload",      no_argument,		NULL, 'U' },
 	 "Unload XDP program instead of loading"},
-
 	{{"quiet",       no_argument,		NULL, 'q' },
 	 "Quiet mode (no output)"},
-
 	{{"filename",    required_argument,	NULL,  1  },
 	 "Load program from <file>", "<file>"},
-
 	{{"progsec",    required_argument,	NULL,  2  },
 	 "Load program in <section> of the ELF file", "<section>"},
-
-
 	{{0, 0, NULL,  0 }}
 };
-
 //restituisce il file descriptor della mappa che si trova nel programma kernel
 int find_map_fd(struct bpf_object *bpf_obj, const char *mapname)
 {
@@ -69,20 +54,16 @@ int find_map_fd(struct bpf_object *bpf_obj, const char *mapname)
 		fprintf(stderr, "ERR: cannot find map by name: %s\n", mapname);
 		goto out;
 	}
-
-
 	map_fd = bpf_map__fd(map);
  out:
 	return map_fd;
 }
-
 
 #define NANOSEC_PER_SEC 1000000000 /* 10^9 */
 static __u64 gettime(void)
 {
 	struct timespec t;
 	int res;
-
 
 	res = clock_gettime(CLOCK_MONOTONIC, &t);
 	if (res < 0) {
@@ -91,37 +72,31 @@ static __u64 gettime(void)
 	}
 	return (__u64) t.tv_sec * NANOSEC_PER_SEC + t.tv_nsec;
 }
-
 //struct per il salvataggio dei dati da stampare
 struct record {
 	__u64 timestamp;
 	struct datarec total; /* defined in common_kern_user.h */
 };
-
 //insieme di record uno per ogni mappa
 struct stats_record {
 	struct record stats[33];
 };
-
 
 static double calc_period(struct record *r, struct record *p)
 {
 	double period_ = 0;
 	__u64 period = 0;
 
-
 	period = r->timestamp - p->timestamp;
 	if (period > 0)
 		period_ = ((double) period / NANOSEC_PER_SEC);
-
 
 	return period_;
 }
 static void stats_print_header()
 {
-		printf("%-12s\n", "Mappa Valori Totali");
+	printf("%-12s\n", "Mappa Valori Totali");
 }
-
 //stampa le statistiche, pacchetti totali elaborati, pacchetti per secondo elaborati,
 //MB totali, MB/s
 static void stats_print(struct stats_record *stats_rec,
@@ -134,9 +109,7 @@ static void stats_print(struct stats_record *stats_rec,
 	double bps; /* bits per sec */
 	int i;
 
-
 	stats_print_header(); /* Print stats "header" */
-
 
 	/* stampa per ogni mappa */
 	for (i = 0; i < 33; i++)
@@ -147,30 +120,24 @@ static void stats_print(struct stats_record *stats_rec,
 		char action[10];
 		sprintf(action,"%d",i);
 
-
 		rec  = &stats_rec->stats[i];
 		prev = &stats_prev->stats[i];
-
 
 		period = calc_period(rec, prev);
 		if (period == 0)
 		       return;
 
-
 		packets = rec->total.rx_packets - prev->total.rx_packets;
 		pps     = packets / period;
 
-
 		bytes   = rec->total.rx_bytes   - prev->total.rx_bytes;
 		bps     = (bytes * 8)/ period / 1000000;
-
 
 		printf(fmt, action, rec->total.rx_packets, pps,
 		       rec->total.rx_bytes / 1000 , bps,
 		       period);
 	}
 }
-
 
 /* BPF_MAP_TYPE_PERCPU_ARRAY */
 void map_get_value_percpu_array(int fd, __u32 key, struct datarec *value)
@@ -182,15 +149,13 @@ void map_get_value_percpu_array(int fd, __u32 key, struct datarec *value)
 	__u64 sum_pkts = 0;
 	int i;
 
-
 	if ((bpf_map_lookup_elem(fd, &key, values)) != 0) {
 		fprintf(stderr,
 			"ERR: bpf_map_lookup_elem failed key:0x%X\n", key);
 		return;
 	}
 
-
-	/* Somma le statistiche per ogni core */
+	/* Somma le statistiche per ogni mappa */
 	for (i = 0; i < nr_cpus; i++) {
 		sum_pkts  += values[i].rx_packets;
 		sum_bytes += values[i].rx_bytes;
@@ -203,7 +168,6 @@ static bool map_collect(int fd, __u32 map_type, __u32 key, struct record *rec)
 	struct datarec value;
 	/* Get time as close as possible to reading map contents */
 	rec->timestamp = gettime();
-
 	switch (map_type) {
 	case BPF_MAP_TYPE_PERCPU_ARRAY:
 		map_get_value_percpu_array(fd, key, &value);
@@ -214,14 +178,10 @@ static bool map_collect(int fd, __u32 map_type, __u32 key, struct record *rec)
 		return false;
 		break;
 	}
-
-
-
 	rec->total.rx_packets = value.rx_packets;
 	rec->total.rx_bytes   = value.rx_bytes;
 	return true;
 }
-
 //salva il valore per ognuno dei 33 array nella mappa
 static void stats_collect(int map_fd, __u32 map_type,
 			  struct stats_record *stats_rec)
@@ -232,20 +192,16 @@ static void stats_collect(int map_fd, __u32 map_type,
 	}
 }
 
-
 static void stats_poll(int map_dati_fd, __u32 map_type, int interval)
 {
 	struct stats_record prev0, record0 = { 0 };
-
 	/* Trick to pretty printf with thousands separators use %' */
 	setlocale(LC_NUMERIC, "en_US");
-
 	/* Print stats "header" */
 	if (verbose) {
 		printf("\n");
 		printf("%-12s\n", "XDP-action");
 	}
-
 	while (1) {
 		prev0 = record0; /* struct copy */
 		stats_collect(map_dati_fd, map_type, &record0);
@@ -253,7 +209,6 @@ static void stats_poll(int map_dati_fd, __u32 map_type, int interval)
 		sleep(2);
 	}
 }
-
 //controlla File descriptor e che la grandezza chiave valore corrisponda
 static int __check_map_fd_info(int map_fd, struct bpf_map_info *info,
 			       struct bpf_map_info *exp)
@@ -269,8 +224,6 @@ static int __check_map_fd_info(int map_fd, struct bpf_map_info *info,
 			__func__,  strerror(errno));
 		return EXIT_FAIL_BPF;
 	}
-
-
 	if (exp->key_size && exp->key_size != info->key_size) {
 		fprintf(stderr, "ERR: %s() "
 			"Map key size(%d) mismatch expected size(%d)\n",
@@ -296,17 +249,27 @@ static int __check_map_fd_info(int map_fd, struct bpf_map_info *info,
 		return EXIT_FAIL;
 	}
 
-
 	return 0;
 }
 //legge i valori in mappa/num.txt li converte e li salva nelle relative mappe
 void mappa(int fds[]){
 	__u64 counttot=0;
 	__u8 pass = XDP_PASS;//azione di default
+	//__u8 value =XDP_PASS;
+	__u8 uno = 1;
+	__u8 zero = 0;
+	size_t key_size_ipv4;
+	struct bpf_lpm_trie_key *key_ipv4;
+	key_size_ipv4 = sizeof(*key_ipv4) + sizeof(__u32);
+	key_ipv4 = alloca(key_size_ipv4);
 
-	//legge i file da 24 a 32 nella cartella mappe
+
+
+
 	for(int i=24; i<=32;i++){
 		__u64 count=0;
+
+
 		FILE * fp;
 		char stringa[50];
 		sprintf(stringa,"mappe/%d.txt",i);
@@ -320,53 +283,75 @@ void mappa(int fds[]){
 		}
 		while ((read = getline(&line, &len, fp)) != -1) {
 
-
 			//elimina \n da line
 			line[strcspn(line,"\n")]=0;
-			//convete gli ip da formato decimale puntato a binario
-			struct sockaddr_in sa_param;
-			inet_pton(AF_INET, line, &(sa_param.sin_addr));
-			__u32 ip = sa_param.sin_addr.s_addr;
-			//carica gli ip convertiti nelle mappe da 24 a 32
-			assert(bpf_map_update_elem(fds[i-24],&ip,&i,BPF_ANY)==0);
+
+		  	struct sockaddr_in sa_param;
+	  		inet_pton(AF_INET, line, &(sa_param.sin_addr));
+	  		__u32 ip = sa_param.sin_addr.s_addr;
+	  		//mascherato con 255.255.255.0
+	  		__u32 ipmascherato = ip&16777215;
+			//aggiunge gli ip provenienti dal file 24
+			if(i==24){
+		  		assert(bpf_map_update_elem(fd24,&ipmascherato,&zero,BPF_ANY)==0);
+			}else{
+				__u8 value;
+				bpf_map_lookup_elem(fd24,&ipmascherato,&value);
+				//se presente nella mappa 24
+				if(value==0){
+					//aggiorna TBL24
+		  			assert(bpf_map_update_elem(fd24,&ipmascherato,&uno,BPF_EXIST)==0);
+					inet_pton(AF_INET, line, &(sa_param.sin_addr));
+					__u32 ip = sa_param.sin_addr.s_addr;
+					//carica gli ip convertiti nelle mappe da 24 a 32
+					assert(bpf_map_update_elem(fds[i-24],&ip,&i,BPF_ANY)==0);
+
+				}
+				//presente in TBL24 e flag = 1
+				else{
+					inet_pton(AF_INET, line, &(sa_param.sin_addr));
+					__u32 ip = sa_param.sin_addr.s_addr;
+					//carica gli ip convertiti nelle mappe da 24 a 32
+					assert(bpf_map_update_elem(fds[i-24],&ip,&i,BPF_ANY)==0);
+
+				}
+			}
+
 			count++;
 			counttot++;
-			}
+
+
+	    	}
 		fclose(fp);
 	    	if (line)
 		free(line);
 		printf("Numero regole in mappa %d = %llu Numero totale = %llu\n",i,count,counttot);
 
+
+	    	//printf("fine\n");
+
+
 	}
 	return;
 }
-
 int main(int argc, char **argv)
 {
 	struct bpf_map_info map_expect = { 0 };
 	struct bpf_map_info info = { 0 };
 	struct bpf_object *bpf_obj;
-
-
 	int interval = 2;
 	int err;
-
-
 	struct config cfg = {
 		.xdp_flags = XDP_FLAGS_UPDATE_IF_NOEXIST | XDP_FLAGS_DRV_MODE,
 		.ifindex   = -1,
 		.do_unload = false,
 	};
 
-
-
 	/* Set default BPF-ELF object file and BPF program name */
 	strncpy(cfg.filename, default_filename, sizeof(cfg.filename));
 	strncpy(cfg.progsec,  default_progsec,  sizeof(cfg.progsec));
 	/* Cmdline options can change progsec */
 	parse_cmdline_args(argc, argv, long_options, &cfg, __doc__);
-
-
 	/* Required option */
 	if (cfg.ifindex == -1) {
 		fprintf(stderr, "ERR: required option --dev missing\n");
@@ -375,21 +360,15 @@ int main(int argc, char **argv)
 	}
 	if (cfg.do_unload)
 		return xdp_link_detach(cfg.ifindex, cfg.xdp_flags, 0);
-
-
 	bpf_obj = load_bpf_and_xdp_attach(&cfg);
 	if (!bpf_obj)
 		return EXIT_FAIL_BPF;
-
-
 	if (verbose) {
 		printf("Success: Loaded BPF-object(%s) and used section(%s)\n",
 		       cfg.filename, cfg.progsec);
 		printf(" - XDP prog attached on device:%s(ifindex:%d)\n",
 		       cfg.ifname, cfg.ifindex);
 	}
-
-
   	int map_dati_fd;
 	int map_lpm32_fd;
 	int map_lpm31_fd;
@@ -459,12 +438,12 @@ int main(int argc, char **argv)
 
 
 
+
 	map_dati_fd = find_map_fd(bpf_obj, "dati");
 	if (map_dati_fd < 0) {
 		xdp_link_detach(cfg.ifindex, cfg.xdp_flags, 0);
 		return EXIT_FAIL_BPF;
 	}
-
 	//controllo correttezza tipi chiave e valore mappe
 	map_expect.key_size    = sizeof(__u32);
 	map_expect.value_size  = sizeof(struct datarec);

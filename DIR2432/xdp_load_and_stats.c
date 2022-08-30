@@ -190,7 +190,7 @@ void map_get_value_percpu_array(int fd, __u32 key, struct datarec *value)
 		return;
 	}
 
-	/* Somma le statistiche per ogni core */
+	/* Somma le statistiche per ogni mappa */
 	for (i = 0; i < nr_cpus; i++) {
 		sum_pkts  += values[i].rx_packets;
 		sum_bytes += values[i].rx_bytes;
@@ -333,23 +333,36 @@ void mappa(int fd32, int fd24 ){
 
 			//elimina \n da line
 			line[strcspn(line,"\n")]=0;
+			struct sockaddr_in sa_param;
+	  		inet_pton(AF_INET, line, &(sa_param.sin_addr));
+	  		__u32 ip = sa_param.sin_addr.s_addr;
+	  		//mascherato con 255.255.255.0
+	  		__u32 ipmascherato = ip&16777215;
 			//inserisce le mappe dal file /24
+
 			if(i==24){
-				//convete gli ip da formato decimale puntato a binario
-				struct sockaddr_in sa_param;
-		  		inet_pton(AF_INET, line, &(sa_param.sin_addr));
-		  		__u32 ip = sa_param.sin_addr.s_addr;
-				//carica gli ip convertiti nell'array /24
-		  		assert(bpf_map_update_elem(fd24,&ip,&i,BPF_ANY)==0);
+				assert(bpf_map_update_elem(fd24,&ipmascherato,&zero,BPF_ANY)==0);
 			//inserisce le mappe estese a /32
 			}else{
-				//convete gli ip da formato decimale puntato a binario
-				struct sockaddr_in sa_param;
-		  		inet_pton(AF_INET, line, &(sa_param.sin_addr));
-		  		__u32 ip = sa_param.sin_addr.s_addr;
-				//carica gli ip estesi a /32 nella mappa
-		  		assert(bpf_map_update_elem(fd32,&ip,&i,BPF_ANY)==0);
+				//se presente nella mappa 24
+				__u8 value;
+				bpf_map_lookup_elem(fd24,&ipmascherato,&value);
+				if(value==0){
+		  			assert(bpf_map_update_elem(fd24,&ipmascherato,&uno,BPF_EXIST)==0);
+					inet_pton(AF_INET, line, &(sa_param.sin_addr));
+					__u32 ip = sa_param.sin_addr.s_addr;
+					//carica gli ip convertiti nelle mappe da 24 a 32
+					assert(bpf_map_update_elem(fds[i-24],&ip,&i,BPF_ANY)==0);
 
+				}
+				//non presente nella mappa /24
+				else{
+					inet_pton(AF_INET, line, &(sa_param.sin_addr));
+					__u32 ip = sa_param.sin_addr.s_addr;
+					//carica gli ip convertiti nelle mappe da 24 a 32
+		  			assert(bpf_map_update_elem(fd32,&ip,&i,BPF_ANY)==0);
+
+				}
 			}
 			count++;
 			counttot++;
