@@ -45,14 +45,14 @@ Il programma controlla se il paccchetto è UDP e cerca all'interno del suo heade
 Ad esempio il programma blocca i pacchetti che vanno verso la porta 443.
 
 ## Dir24
-Il programma legge gli ip contenuti nella cartella *mappe* e inserisce gli ip contenuti nel file /24 in un array con 16.777.216 entries e tutti gli altri ip, da /25 a /32 in un LPM_TRIE, poi controlla se sono contenuti nell'array o nella mappa e li blocca.
+Il programma legge gli ip contenuti nella cartella *mappe* e inserisce gli ip del file /24 in un array con 16.777.216 entries e tutti gli altri ip, da /25 a /32 in un LPM_TRIE, poi controlla se sono contenuti nell'array o nella mappa e li blocca.
 Per permettere il funzionamento del programma la cartella mappe.zip va estratta.
 
 ## Dir24Hash
 Il programma funziona come il precedente, Dir24, ma gli ip contenuti nei file da /25 a /32 vengono inseriti in 8 HashMap diverse.
 Per permettere il funzionamento del programma la cartella mappe.zip va estratta.
 ## Dir2432
-Il programma funziona come il precedente, Dir24, ma gli ip da /25 a /32 sono espansi in un unica HashMap.
+Il programma funziona come il precedente, Dir24, ma gli ip da /25 a /32 sono espansi in un'unica HashMap.
 L'espansione delle rotte viene eseguita tramite la libreria python **ipaddress**.
 ``` python
 #crea una lista di ip espansi a /32 dall'ip e prefisso in input e lo salva in ips rimuovendo /32
@@ -66,7 +66,7 @@ Il programma stampa una lista di tutte e 32 le mappe con i relativi contatori, P
 Per permettere il funzionamento del programma la cartella mappe.zip va estratta.
 
 ## LPMtrie
-Il programma implementa LPM usando una struttura di ebpf, **BPF_MAP_TYPE_LPM_TRIE**, per contenere tutti gli indirizzi ip.
+Il programma implementa LPM usando una struttura di ebpf, **BPF_MAP_TYPE_LPM_TRIE**, per contenere tutti gli indirizzi ip.  
 Caricamento ip nel trie:
 ``` c
 size_t key_size_ipv4;
